@@ -6,7 +6,7 @@ const { dataSource } = require('../db/data-source')
 const logger = require('../utils/logger')('UsersController')
 const generateJWT = require('../utils/generateJWT')
 
-const passwordPattern = /(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,16}/
+const passwordPattern = /(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{10,16}/
 
 function isUndefined (value) {
   return value === undefined
@@ -76,7 +76,7 @@ class UsersController {
 
   static async postLogin (req, res, next) {
     try {
-      const passwordPattern = /(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,16}/
+      const passwordPattern = /(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{10,16}/
       const { email, password } = req.body
       if (isUndefined(email) || isNotValidSting(email) || isUndefined(password) || isNotValidSting(password)) {
         logger.warn('欄位未填寫正確')
