@@ -59,11 +59,28 @@
             />
           </div>
 
+          <div class="flex flex-col gap-2">
+            <label for="birthday" class="text-lg font-medium text-primary-0"
+              >生日</label
+            >
+            <input
+              id="birthday"
+              type="date"
+              v-model="user.birthday"
+              @keyup.enter="signup"
+              class="px-4 py-2 bg-primary-800 border border-primary-600 rounded-lg focus:outline-none focus:border-secondary-800 text-primary-0"
+            />
+            <p v-if="birthdayError" class="text-sm text-red-400">
+              {{ birthdayError }}
+            </p>
+          </div>
+
           <button
             @click="signup"
-            class="w-full bg-secondary-800 text-primary-900 text-lg py-2 mt-2 rounded-lg font-medium hover:opacity-90 transition-opacity"
+            :disabled="isLoading || !!birthdayError"
+            class="w-full bg-secondary-800 text-primary-900 text-lg py-2 mt-2 rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            註冊
+            {{ isLoading ? "註冊中..." : "註冊" }}
           </button>
 
           <p class="text-center text-sm text-primary-400">
@@ -89,7 +106,7 @@
 </template>
 
 <script setup>
-import { ref, getCurrentInstance } from "vue";
+import { ref, computed, getCurrentInstance } from "vue";
 import { useRouter } from "vue-router";
 import { postSignup } from "../../../api/index.js";
 import swalHandler from "../../../utils/swalHandler.js";
@@ -102,6 +119,42 @@ const user = ref({
   password: "",
   confirmPassword: "",
   name: "",
+  birthday: "",
+});
+
+const isLoading = ref(false);
+
+const birthdayError = computed(() => {
+  if (!user.value.birthday) {
+    return "";
+  }
+
+  const birthday = new Date(user.value.birthday);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // 檢查是否為未來日期
+  if (birthday > today) {
+    return "生日不能是未來日期";
+  }
+
+  // 計算年齡
+  let age = today.getFullYear() - birthday.getFullYear();
+  const monthDifference = today.getMonth() - birthday.getMonth();
+
+  if (
+    monthDifference < 0 ||
+    (monthDifference === 0 && today.getDate() < birthday.getDate())
+  ) {
+    age--;
+  }
+
+  // 檢查年齡限制（至少 13 歲）
+  if (age < 13) {
+    return "必須年滿 13 歲才能註冊";
+  }
+
+  return "";
 });
 
 // 驗證密碼是否一致
@@ -119,8 +172,27 @@ async function signup() {
     return;
   }
 
+  // 驗證生日
+  if (birthdayError.value) {
+    swalHandler(proxy.$swal, birthdayError.value);
+    return;
+  }
+
+  isLoading.value = true;
+
   try {
-    const { status } = await postSignup(user.value);
+    const signupData = {
+      email: user.value.email,
+      password: user.value.password,
+      name: user.value.name,
+    };
+
+    // 只在填入生日時才包含到請求中
+    if (user.value.birthday) {
+      signupData.birthday = user.value.birthday;
+    }
+
+    const { status } = await postSignup(signupData);
     if (status === "success") {
       swalHandler(proxy.$swal, "註冊成功");
 
@@ -138,11 +210,13 @@ async function signup() {
 
       if (status === "failed") {
         swalHandler(proxy.$swal, message);
+        isLoading.value = false;
         return;
       }
     }
 
-    throw new Error(`[getCoachCourseList] error : ${msg}`);
+    isLoading.value = false;
+    throw new Error(`[signup] error : ${msg}`);
   }
 }
 </script>

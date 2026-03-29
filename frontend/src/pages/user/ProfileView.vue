@@ -108,12 +108,32 @@
               />
             </div>
 
+            <div>
+              <label
+                for="birthday"
+                class="block text-base font-medium text-primary-0 mb-2"
+              >
+                生日
+              </label>
+              <input
+                type="date"
+                id="birthday"
+                v-model="profileForm.birthday"
+                class="w-full px-4 py-2 border border-primary-600 bg-primary-700 text-primary-0 rounded-lg focus:outline-none focus:border-secondary-800 transition duration-200 placeholder-primary-400"
+                placeholder="請選擇生日"
+              />
+              <p v-if="birthdayError" class="text-sm text-red-400 mt-1">
+                {{ birthdayError }}
+              </p>
+            </div>
+
             <div class="flex justify-end pt-4">
               <button
                 @click="updateProfile"
-                class="px-8 py-3 bg-secondary-800 text-primary-900 font-medium rounded-lg hover:bg-secondary-700 active:bg-secondary-600 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-secondary-800 focus:ring-offset-2 focus:ring-offset-primary-900 transition-all duration-200"
+                :disabled="isLoading || !!birthdayError"
+                class="px-8 py-3 bg-secondary-800 text-primary-900 font-medium rounded-lg hover:bg-secondary-700 active:bg-secondary-600 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-secondary-800 focus:ring-offset-2 focus:ring-offset-primary-900 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                儲存變更
+                {{ isLoading ? "保存中..." : "儲存變更" }}
               </button>
             </div>
           </div>
@@ -186,9 +206,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted, getCurrentInstance } from "vue";
+import { ref, onMounted, getCurrentInstance, computed } from "vue";
 import { useUserStore } from "../../stores/user.js";
-const { setUserName } = useUserStore();
+const { setUserName, setBirthday } = useUserStore();
 import {
   getUserProfile,
   putUserProfile,
@@ -202,6 +222,7 @@ const activeTab = ref("profile");
 const profileForm = ref({
   email: "",
   name: "",
+  birthday: "",
 });
 const passwordForm = ref({
   password: "",
@@ -209,16 +230,71 @@ const passwordForm = ref({
   confirm_new_password: "",
 });
 
+const isLoading = ref(false);
+
+const birthdayError = computed(() => {
+  if (!profileForm.value.birthday) {
+    return "";
+  }
+
+  const birthday = new Date(profileForm.value.birthday);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // 檢查是否為未來日期
+  if (birthday > today) {
+    return "生日不能是未來日期";
+  }
+
+  // 計算年齡
+  let age = today.getFullYear() - birthday.getFullYear();
+  const monthDifference = today.getMonth() - birthday.getMonth();
+
+  if (
+    monthDifference < 0 ||
+    (monthDifference === 0 && today.getDate() < birthday.getDate())
+  ) {
+    age--;
+  }
+
+  // 檢查年齡限制（至少 13 歲）
+  if (age < 13) {
+    return "必須年滿 13 歲";
+  }
+
+  return "";
+});
+
 async function updateProfile() {
+  // 驗證生日
+  if (birthdayError.value) {
+    swalHandler(proxy.$swal, birthdayError.value);
+    return;
+  }
+
+  isLoading.value = true;
+
   try {
-    const { status } = await putUserProfile({
+    const updateData = {
       name: profileForm.value.name,
-    });
+    };
+
+    // 只在填入生日時才包含到請求中
+    if (profileForm.value.birthday) {
+      updateData.birthday = profileForm.value.birthday;
+    }
+
+    const { status } = await putUserProfile(updateData);
     if (status === "success") {
       getProfile();
+      if (profileForm.value.birthday) {
+        setBirthday(profileForm.value.birthday);
+      }
       swalHandler(proxy.$swal, "資料已更新");
+      isLoading.value = false;
     }
   } catch (error) {
+    isLoading.value = false;
     let msg = error.message;
 
     if (Object.hasOwn(error.response, "data")) {
