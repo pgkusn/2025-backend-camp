@@ -1,0 +1,83 @@
+schema: spec-driven
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+# Add your tech stack, conventions, style guides, domain knowledge, etc.
+context: |
+  ## 專案概述
+  健身房管理系統 - 全端應用，包含會員管理、教練管理、課程預約、訂單管理等功能
+
+  ## 技術堆疊
+
+  ### 後端
+  - 框架: Express.js
+  - ORM: TypeORM (使用 EntitySchema 模式，非 decorator)
+  - 資料庫: PostgreSQL 17
+  - 認證: JWT + Role-based access control (USER, COACH, ADMIN)
+  - 日誌: Pino
+  - 測試: Jest (單元測試 + 整合測試)
+  - 配置: ConfigManager (集中管理)
+
+  ### 前端
+  - 框架: Vue 3
+  - 構建: Vite
+  - CSS: Tailwind CSS 4
+  - 狀態管理: Pinia
+  - 路由: Vue Router
+  - HTTP 客戶端: Axios
+
+  ### 容器化
+  - Docker Compose
+  - 三個服務: postgres, backend, frontend
+
+  ## 架構
+
+  - **分層架構**: routes → controllers → entities
+  - **認證**: JWT middleware factory pattern
+  - **資料庫**: TypeORM EntitySchema + PostgreSQL
+  - **配置**: 集中式 ConfigManager
+  - **日誌**: Pino + pino-http
+  - **測試**: 整合測試需 sequential 模式執行 (`-i` flag)
+
+  ## 主要實體
+  - User (包含 coach 和 admin 角色)
+  - Coach (教練資料)
+  - Skill (技能/專長)
+  - CoachLinkSkill (多對多關聯)
+  - Course (課程)
+  - CourseBooking (課程預約)
+  - CreditPackage (點數方案)
+  - CreditPurchase (點數購買記錄)
+
+  ## 約定與慣例
+  - 語言: 繁體中文
+  - 提交格式: Conventional Commits
+  - Entity 定義: EntitySchema (不使用 decorator)
+  - 開發環境: DB_SYNCHRONIZE=true
+  - 生產環境: DB_SYNCHRONIZE=false（使用 migration）
+  - Docker 內 DB_HOST: postgres
+  - 本機開發 DB_HOST: localhost
+  - 日誌輪轉: max-size 10m, max-file 3
+
+  ## 常用指令
+  - `npm start`: 啟動所有服務 (Docker)
+  - `npm run dev`: 本機開發 (後端)
+  - `npm test`: 執行所有測試
+  - `npm run test:integration`: 執行整合測試 (sequential mode)
+  - `npm run init:schema`: 初始化資料庫架構
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+rules:
+  proposal:
+    - Keep proposals under 500 words
+    - Include "目標" 和 "非目標" 部分
+    - 使用繁體中文
+  tasks:
+    - Break tasks into chunks of max 2 hours
+    - 每項任務需明確說明涉及的檔案和實體
+  implementation:
+    - 後端: Entity 使用 EntitySchema 模式，Repository 進行資料操作
+    - 前端: 使用 Pinia store 管理狀態，Axios 進行 API 呼叫
+    - 整合測試需加上 `-i` sequential mode
+    - 資料庫修改後執行 `npm run init:schema`
