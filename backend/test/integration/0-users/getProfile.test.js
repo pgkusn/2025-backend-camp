@@ -58,6 +58,18 @@ describe(`GET ${route}`, () => {
     expect(result.body.data.user.name).toEqual(testUserInfo.name)
     expect(result.body.data.user.email).toEqual(testUserInfo.email)
   })
+
+  it('取得的使用者資料應包含 birthday 欄位（可為 null）', async () => {
+    const result = await server
+      .get(route)
+      .set('Accept', 'application/json')
+      .set('Authorization', `Bearer ${token}`)
+      .expect('Content-Type', /json/)
+      .expect(StatusCodes.OK)
+    expect(result.body.status).toEqual('success')
+    expect(result.body.data.user).toHaveProperty('birthday')
+    // birthday 可能為 null 或 undefined（因為沒有在註冊時設定）
+  })
   it('資料庫發生錯誤，回傳HTTP Code 500', async () => {
     const userRepo = dataSource.getRepository('User')
     jest.spyOn(userRepo, 'findOne').mockImplementation(() => {
