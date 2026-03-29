@@ -40,6 +40,10 @@ module.exports = new EntitySchema({
       type: 'timestamp',
       updateDate: true,
       nullable: false
+    },
+    birthday: {
+      type: 'date',
+      nullable: true
     }
   }
 })

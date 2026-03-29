@@ -16,10 +16,48 @@ function isNotValidSting (value) {
   return typeof value !== 'string' || value.trim().length === 0 || value === ''
 }
 
+function validateBirthday (birthday) {
+  if (birthday === undefined || birthday === null || birthday === '') {
+    return { valid: true, message: null } // 生日是可選的
+  }
+
+  // 驗證日期格式 YYYY-MM-DD
+  const datePattern = /^\d{4}-\d{2}-\d{2}$/
+  if (!datePattern.test(birthday)) {
+    return { valid: false, message: '生日格式不正確，應為 YYYY-MM-DD' }
+  }
+
+  const birthDate = new Date(birthday)
+  const today = new Date()
+
+  // 驗證日期有效性
+  if (isNaN(birthDate.getTime())) {
+    return { valid: false, message: '生日日期無效' }
+  }
+
+  // 驗證不能是未來日期
+  if (birthDate > today) {
+    return { valid: false, message: '生日不能是未來日期' }
+  }
+
+  // 驗證最少年齡（13 歲）
+  const age = today.getFullYear() - birthDate.getFullYear()
+  const monthDiff = today.getMonth() - birthDate.getMonth()
+  const actualAge = monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())
+    ? age - 1
+    : age
+
+  if (actualAge < 13) {
+    return { valid: false, message: '年齡必須滿 13 歲' }
+  }
+
+  return { valid: true, message: null }
+}
+
 class UsersController {
   static async postSignup (req, res, next) {
     try {
-      const { name, email, password } = req.body
+      const { name, email, password, birthday } = req.body
       if (isUndefined(name) || isNotValidSting(name) || isUndefined(email) || isNotValidSting(email) || isUndefined(password) || isNotValidSting(password)) {
         logger.warn('欄位未填寫正確')
         res.status(400).json({
@@ -36,6 +74,18 @@ class UsersController {
         })
         return
       }
+
+      // 驗證生日
+      const birthdayValidation = validateBirthday(birthday)
+      if (!birthdayValidation.valid) {
+        logger.warn('建立使用者錯誤:', birthdayValidation.message)
+        res.status(400).json({
+          status: 'failed',
+          message: birthdayValidation.message
+        })
+        return
+      }
+
       const userRepository = dataSource.getRepository('User')
       const existingUser = await userRepository.findOne({
         where: { email }
@@ -55,7 +105,8 @@ class UsersController {
         name,
         email,
         role: 'USER',
-        password: hashPassword
+        password: hashPassword,
+        birthday: birthday || null
       })
       const savedUser = await userRepository.save(newUser)
       logger.info('新建立的使用者ID:', savedUser.id)
@@ -143,7 +194,7 @@ class UsersController {
       const { id } = req.user
       const userRepository = dataSource.getRepository('User')
       const user = await userRepository.findOne({
-        select: ['name', 'email'],
+        select: ['name', 'email', 'birthday'],
         where: { id }
       })
       res.status(200).json({
@@ -201,8 +252,10 @@ class UsersController {
   static async putProfile (req, res, next) {
     try {
       const { id } = req.user
-      const { name } = req.body
-      if (isUndefined(name) || isNotValidSting(name)) {
+      const { name, birthday } = req.body
+
+      // 驗證名稱
+      if (!isUndefined(name) && isNotValidSting(name)) {
         logger.warn('欄位未填寫正確')
         res.status(400).json({
           status: 'failed',
@@ -210,26 +263,53 @@ class UsersController {
         })
         return
       }
+
+      // 驗證生日（如果提供）
+      if (!isUndefined(birthday)) {
+        const birthdayValidation = validateBirthday(birthday)
+        if (!birthdayValidation.valid) {
+          logger.warn('更新使用者錯誤:', birthdayValidation.message)
+          res.status(400).json({
+            status: 'failed',
+            message: birthdayValidation.message
+          })
+          return
+        }
+      }
+
       const userRepository = dataSource.getRepository('User')
       const user = await userRepository.findOne({
-        select: ['name'],
+        select: ['name', 'birthday'],
         where: {
           id
         }
       })
-      if (user.name === name) {
+
+      // 檢查是否有任何更改
+      const nameChanged = !isUndefined(name) && user.name !== name
+      const birthdayChanged = !isUndefined(birthday) && user.birthday !== birthday
+
+      if (!nameChanged && !birthdayChanged) {
         res.status(400).json({
           status: 'failed',
-          message: '使用者名稱未變更'
+          message: '使用者資料未變更'
         })
         return
       }
+
+      // 準備更新資料
+      const updateData = {}
+      if (nameChanged) {
+        updateData.name = name
+      }
+      if (birthdayChanged) {
+        updateData.birthday = birthday || null
+      }
+
       const updatedResult = await userRepository.update({
-        id,
-        name: user.name
-      }, {
-        name
-      })
+        id
+      }, updateData)
+
       if (updatedResult.affected === 0) {
         res.status(400).json({
           status: 'failed',
@@ -237,8 +317,9 @@ class UsersController {
         })
         return
       }
+
       const result = await userRepository.findOne({
-        select: ['name'],
+        select: ['name', 'birthday'],
         where: {
           id
         }
