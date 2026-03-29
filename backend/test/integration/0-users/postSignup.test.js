@@ -72,7 +72,7 @@ describe(`POST ${route}`, () => {
     expect(result.body.message).toBe('Email 已被使用')
   })
   it('資料庫發生錯誤，回傳HTTP Code 500', async () => {
-    jest.spyOn(dataSource, 'getRepository').mockImplementation(() => {
+    const spy = jest.spyOn(dataSource, 'getRepository').mockImplementation(() => {
       throw new Error('資料庫發生錯誤')
     })
     const result = await server
@@ -83,6 +83,7 @@ describe(`POST ${route}`, () => {
       .expect(500)
     expect(result.body.status).toEqual('error')
     expect(result.body.message).toEqual('伺服器錯誤')
+    spy.mockRestore()
   })
 
   // 生日相關測試

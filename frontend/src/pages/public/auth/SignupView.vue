@@ -67,7 +67,9 @@
               id="birthday"
               type="date"
               v-model="user.birthday"
+              :max="todayString"
               @keyup.enter="signup"
+              placeholder="YYYY-MM-DD"
               class="px-4 py-2 bg-primary-800 border border-primary-600 rounded-lg focus:outline-none focus:border-secondary-800 text-primary-0"
             />
             <p v-if="birthdayError" class="text-sm text-red-400">
@@ -124,37 +126,39 @@ const user = ref({
 
 const isLoading = ref(false);
 
+// 計算今天的日期字符串（用於 date input 的 max 屬性）
+const todayString = computed(() => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+});
+
+// 前端只做基礎格式驗證，詳細驗證由後端處理
 const birthdayError = computed(() => {
   if (!user.value.birthday) {
-    return "";
+    return "" // 生日欄位為可選
   }
 
-  const birthday = new Date(user.value.birthday);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  // 檢查是否為未來日期
-  if (birthday > today) {
-    return "生日不能是未來日期";
+  // 只驗證日期格式
+  const BIRTHDAY_FORMAT = /^\d{4}-\d{2}-\d{2}$/
+  if (!BIRTHDAY_FORMAT.test(user.value.birthday)) {
+    return "日期格式不正確，應為 YYYY-MM-DD"
   }
 
-  // 計算年齡
-  let age = today.getFullYear() - birthday.getFullYear();
-  const monthDifference = today.getMonth() - birthday.getMonth();
-
+  // 驗證日期是否有效（避免 02-30 等無效日期）
+  const [year, month, day] = user.value.birthday.split("-")
+  const testDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
   if (
-    monthDifference < 0 ||
-    (monthDifference === 0 && today.getDate() < birthday.getDate())
+    testDate.getFullYear() !== parseInt(year) ||
+    testDate.getMonth() !== parseInt(month) - 1 ||
+    testDate.getDate() !== parseInt(day)
   ) {
-    age--;
+    return "生日日期無效"
   }
 
-  // 檢查年齡限制（至少 13 歲）
-  if (age < 13) {
-    return "必須年滿 13 歲才能註冊";
-  }
-
-  return "";
+  return ""
 });
 
 // 驗證密碼是否一致
@@ -172,7 +176,7 @@ async function signup() {
     return;
   }
 
-  // 驗證生日
+  // 驗證生日（前端基礎驗證）
   if (birthdayError.value) {
     swalHandler(proxy.$swal, birthdayError.value);
     return;
@@ -204,19 +208,21 @@ async function signup() {
   } catch (error) {
     let msg = error.message;
 
+    // 優先使用後端的詳細驗證訊息（年齡、日期等）
     if (Object.hasOwn(error.response, "data")) {
       const { status, message } = error.response.data;
       msg = message;
 
       if (status === "failed") {
         swalHandler(proxy.$swal, message);
-        isLoading.value = false;
         return;
       }
     }
 
-    isLoading.value = false;
+    swalHandler(proxy.$swal, "註冊失敗，請重試");
     throw new Error(`[signup] error : ${msg}`);
+  } finally {
+    isLoading.value = false;
   }
 }
 </script>

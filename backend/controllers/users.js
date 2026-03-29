@@ -16,22 +16,32 @@ function isNotValidSting (value) {
   return typeof value !== 'string' || value.trim().length === 0 || value === ''
 }
 
+/**
+ * 驗證生日有效性
+ * @param {string|undefined} birthday - YYYY-MM-DD 格式或空值
+ * @returns {Object} { valid: boolean, message: string|null }
+ */
 function validateBirthday (birthday) {
   if (birthday === undefined || birthday === null || birthday === '') {
     return { valid: true, message: null } // 生日是可選的
   }
 
   // 驗證日期格式 YYYY-MM-DD
-  const datePattern = /^\d{4}-\d{2}-\d{2}$/
-  if (!datePattern.test(birthday)) {
+  const BIRTHDAY_FORMAT = /^\d{4}-\d{2}-\d{2}$/
+  if (!BIRTHDAY_FORMAT.test(birthday)) {
     return { valid: false, message: '生日格式不正確，應為 YYYY-MM-DD' }
   }
 
-  const birthDate = new Date(birthday)
+  // 使用本地時間解析日期（避免時區問題）
+  const [year, month, day] = birthday.split('-')
+  const birthDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
   const today = new Date()
+  today.setHours(0, 0, 0, 0) // 清除時間部分，只比較日期
 
-  // 驗證日期有效性
-  if (isNaN(birthDate.getTime())) {
+  // 驗證日期有效性（檢查月日是否超出範圍）
+  if (birthDate.getFullYear() !== parseInt(year) ||
+      birthDate.getMonth() !== parseInt(month) - 1 ||
+      birthDate.getDate() !== parseInt(day)) {
     return { valid: false, message: '生日日期無效' }
   }
 
@@ -40,14 +50,19 @@ function validateBirthday (birthday) {
     return { valid: false, message: '生日不能是未來日期' }
   }
 
-  // 驗證最少年齡（13 歲）
-  const age = today.getFullYear() - birthDate.getFullYear()
-  const monthDiff = today.getMonth() - birthDate.getMonth()
-  const actualAge = monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())
-    ? age - 1
-    : age
+  // 計算年齡（簡化邏輯）
+  let age = today.getFullYear() - birthDate.getFullYear()
+  const hasHadBirthdayThisYear =
+    today.getMonth() > birthDate.getMonth() ||
+    (today.getMonth() === birthDate.getMonth() &&
+     today.getDate() >= birthDate.getDate())
 
-  if (actualAge < 13) {
+  if (!hasHadBirthdayThisYear) {
+    age--
+  }
+
+  // 驗證最少年齡（13 歲）
+  if (age < 13) {
     return { valid: false, message: '年齡必須滿 13 歲' }
   }
 
@@ -78,7 +93,7 @@ class UsersController {
       // 驗證生日
       const birthdayValidation = validateBirthday(birthday)
       if (!birthdayValidation.valid) {
-        logger.warn('建立使用者錯誤:', birthdayValidation.message)
+        logger.warn('使用者生日驗證失敗:', birthdayValidation.message)
         res.status(400).json({
           status: 'failed',
           message: birthdayValidation.message
@@ -268,7 +283,7 @@ class UsersController {
       if (!isUndefined(birthday)) {
         const birthdayValidation = validateBirthday(birthday)
         if (!birthdayValidation.valid) {
-          logger.warn('更新使用者錯誤:', birthdayValidation.message)
+          logger.warn('使用者生日驗證失敗:', birthdayValidation.message)
           res.status(400).json({
             status: 'failed',
             message: birthdayValidation.message
